@@ -8,9 +8,10 @@ export const authCommand = new Command('auth')
 authCommand
   .command('login')
   .description('Start OAuth flow — prompts for credentials on first run (callback domain: localhost)')
-  .action(async () => {
+  .option('--manual', 'manual mode: paste the callback URL instead of using a local server (for headless/VPS)')
+  .action(async (opts) => {
     try {
-      await login();
+      await login({ manual: opts.manual });
     } catch (error) {
       handleError(error);
     }

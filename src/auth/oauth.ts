@@ -136,10 +136,11 @@ async function resolveCredentials(): Promise<{ clientId: string; clientSecret: s
   );
 }
 
-export async function login(): Promise<void> {
+export async function login(opts?: { manual?: boolean }): Promise<void> {
   const { clientId, clientSecret } = await resolveCredentials();
   const state = randomBytes(16).toString('hex');
-  const port = await findAvailablePort(8420);
+  const useManual = opts?.manual ?? false;
+  const port = useManual ? 8420 : await findAvailablePort(8420);
   const redirectUri = `http://localhost:${port}/callback`;
 
   const authUrl = new URL(STRAVA_AUTH_URL);
@@ -150,19 +151,41 @@ export async function login(): Promise<void> {
   authUrl.searchParams.set('state', state);
   authUrl.searchParams.set('approval_prompt', 'auto');
 
-  // Start callback server before opening browser
-  const callbackPromise = startCallbackServer(port);
+  let code: string;
+  let returnedState: string;
 
-  if (isTTY()) {
-    process.stderr.write('Opening browser for Strava authorization...\n');
-    process.stderr.write(`\nIf browser does not open, visit:\n${authUrl.toString()}\n\n`);
+  if (useManual) {
+    // Manual mode: user opens URL in their browser, pastes the callback URL back
+    process.stderr.write('\n  Open this URL in your browser:\n\n');
+    process.stderr.write(`  ${authUrl.toString()}\n\n`);
+    process.stderr.write('  After authorizing, your browser will redirect to a localhost URL that fails to load.\n');
+    process.stderr.write('  Copy the FULL URL from your browser\'s address bar and paste it here:\n\n');
+
+    const callbackUrl = await readLine('  Callback URL: ');
+    const parsed = new URL(callbackUrl);
+    code = parsed.searchParams.get('code') || '';
+    returnedState = parsed.searchParams.get('state') || '';
+
+    if (!code) {
+      throw new CliError('No authorization code found in the callback URL', ExitCode.AUTH_ERROR);
+    }
+  } else {
+    // Auto mode: start local callback server and open browser
+    const callbackPromise = startCallbackServer(port);
+
+    if (isTTY()) {
+      process.stderr.write('Opening browser for Strava authorization...\n');
+      process.stderr.write(`\nIf browser does not open, visit:\n${authUrl.toString()}\n\n`);
+    }
+
+    await open(authUrl.toString()).catch(() => {
+      // Browser open failed, user will use the URL manually
+    });
+
+    const result = await callbackPromise;
+    code = result.code;
+    returnedState = result.state;
   }
-
-  await open(authUrl.toString()).catch(() => {
-    // Browser open failed, user will use the URL manually
-  });
-
-  const { code, state: returnedState } = await callbackPromise;
 
   if (returnedState !== state) {
     throw new CliError('OAuth state mismatch — possible CSRF attack', ExitCode.AUTH_ERROR);
