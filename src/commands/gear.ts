@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { getGear } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
-import { output } from '../utils/output.js';
+import { output, getFormat } from '../utils/output.js';
 import { formatGear } from '../utils/format.js';
 
 export const gearCommand = new Command('gear')
@@ -14,7 +14,7 @@ gearCommand
   .action(async (id, opts) => {
     try {
       const gear = await getGear(id);
-      output(gear, () => formatGear(gear), opts.pretty);
+      output(gear, () => formatGear(gear), getFormat(opts));
     } catch (error) {
       handleError(error);
     }

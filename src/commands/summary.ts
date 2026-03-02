@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { getAllActivities } from '../api/strava.js';
 import { parseDateRange } from '../utils/date.js';
 import { summarizeActivities, formatSummary } from '../utils/analysis.js';
-import { output } from '../utils/output.js';
+import { output, getFormat } from '../utils/output.js';
 import { handleError } from '../utils/errors.js';
 
 export const summaryCommand = new Command('summary')
@@ -32,7 +32,7 @@ export const summaryCommand = new Command('summary')
       const activities = await getAllActivities({ after, before });
       const summary = summarizeActivities(activities, period);
 
-      output(summary, () => formatSummary(summary), opts.pretty);
+      output(summary, () => formatSummary(summary), getFormat(opts));
     } catch (error) {
       handleError(error);
     }

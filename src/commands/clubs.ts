@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { getClub, getAthleteClubs, getClubActivities, getClubMembers } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
-import { output } from '../utils/output.js';
+import { output, getFormat } from '../utils/output.js';
 import { formatClub } from '../utils/format.js';
 
 export const clubsCommand = new Command('clubs')
@@ -26,7 +26,7 @@ clubsCommand
   .action(async (id, opts) => {
     try {
       const club = await getClub(Number(id));
-      output(club, () => formatClub(club), opts.pretty);
+      output(club, () => formatClub(club), getFormat(opts));
     } catch (error) {
       handleError(error);
     }

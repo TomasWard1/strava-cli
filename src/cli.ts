@@ -9,6 +9,7 @@ import { gearCommand } from './commands/gear.js';
 import { rateLimitCommand } from './commands/ratelimit.js';
 import { summaryCommand } from './commands/summary.js';
 import { trendsCommand } from './commands/trends.js';
+import { checkCommand } from './commands/check.js';
 
 export const program = new Command();
 
@@ -27,3 +28,4 @@ program.addCommand(gearCommand);
 program.addCommand(rateLimitCommand);
 program.addCommand(summaryCommand);
 program.addCommand(trendsCommand);
+program.addCommand(checkCommand);
