@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [staging]
+
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  auto-merge:
+    name: Auto-merge on success
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auto-merge PR
+        run: gh pr merge "$PR_NUMBER" --squash --auto
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Delete branch after merge
+        if: github.event.pull_request.head.ref != 'staging' && github.event.pull_request.head.ref != 'main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "Waiting for merge to complete..."
+          sleep 10
+
+          PR_STATE=$(gh pr view "$PR_NUMBER" --json state --jq '.state')
+          if [ "$PR_STATE" = "MERGED" ]; then
+            echo "PR merged, deleting branch $BRANCH_NAME"
+            git push origin --delete "$BRANCH_NAME" || echo "Branch already deleted"
+          else
+            echo "PR not merged yet, skipping branch deletion"
+          fi

@@ -1,0 +1,45 @@
+name: Promote staging to main
+
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  create-pr:
+    name: Create PR to Main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for existing PR
+        id: check-pr
+        run: |
+          PR_COUNT=$(gh pr list --base main --head staging --state open --json number | jq length)
+          echo "has_pr=$([[ $PR_COUNT -gt 0 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create PR with changelog
+        if: steps.check-pr.outputs.has_pr == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CHANGELOG=$(git log origin/main..origin/staging --oneline --no-merges | head -20)
+          gh pr create \
+            --base main \
+            --head staging \
+            --title "Release: staging -> main" \
+            --body "$(cat <<EOF
+          ## Auto-generated release PR
+
+          All staging tests have passed.
+
+          ### Changes
+          ${CHANGELOG}
+          EOF
+          )"

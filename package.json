@@ -1,0 +1,56 @@
+{
+  "name": "strava-cli",
+  "version": "0.1.0",
+  "description": "Agent-first CLI for the Strava API",
+  "type": "module",
+  "bin": {
+    "strava-cli": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "strava",
+    "cycling",
+    "running",
+    "fitness",
+    "cli",
+    "api",
+    "activities",
+    "segments",
+    "athlete",
+    "agent"
+  ],
+  "author": "Tomas Ward",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TomasWard1/strava-cli"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.0",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.3",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.39.3",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^3.2.4"
+  }
+}
