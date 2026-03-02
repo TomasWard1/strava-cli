@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { getRoute, getAthleteRoutes, getRouteStreams, getAthlete } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
-import { output } from '../utils/output.js';
+import { output, getFormat } from '../utils/output.js';
 import { formatRoute } from '../utils/format.js';
 
 export const routesCommand = new Command('routes')
@@ -32,7 +32,7 @@ routesCommand
   .action(async (id, opts) => {
     try {
       const route = await getRoute(Number(id));
-      output(route, () => formatRoute(route), opts.pretty);
+      output(route, () => formatRoute(route), getFormat(opts));
     } catch (error) {
       handleError(error);
     }

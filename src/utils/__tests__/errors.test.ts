@@ -45,10 +45,12 @@ describe('ExitCode', () => {
 
 describe('handleError', () => {
   let exitSpy: any;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    stdoutSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     stderrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -56,42 +58,67 @@ describe('handleError', () => {
     vi.restoreAllMocks();
   });
 
-  it('outputs JSON with error and code for CliError', () => {
-    handleError(new CliError('auth failed', ExitCode.AUTH_ERROR));
+  describe('non-TTY mode (agent)', () => {
+    beforeEach(() => {
+      // Tests run in non-TTY by default (process.stdout.isTTY is undefined)
+    });
 
-    const output = JSON.parse(stderrSpy.mock.calls[0][0] as string);
-    expect(output.error).toBe('auth failed');
-    expect(output.code).toBe(ExitCode.AUTH_ERROR);
-    expect(exitSpy).toHaveBeenCalledWith(ExitCode.AUTH_ERROR);
+    it('outputs JSON to stdout for CliError', () => {
+      handleError(new CliError('auth failed', ExitCode.AUTH_ERROR));
+
+      const result = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(result.error).toBe('auth failed');
+      expect(result.code).toBe(ExitCode.AUTH_ERROR);
+      expect(exitSpy).toHaveBeenCalledWith(ExitCode.AUTH_ERROR);
+    });
+
+    it('includes context in JSON output when present', () => {
+      handleError(new CliError('network error', ExitCode.NETWORK_ERROR, {
+        endpoint: '/athlete/activities',
+        retryable: true,
+      }));
+
+      const result = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(result.error).toBe('network error');
+      expect(result.code).toBe(ExitCode.NETWORK_ERROR);
+      expect(result.context.endpoint).toBe('/athlete/activities');
+      expect(result.context.retryable).toBe(true);
+    });
+
+    it('handles unknown errors with GENERAL_ERROR', () => {
+      handleError('string error');
+
+      const result = JSON.parse(stdoutSpy.mock.calls[0][0] as string);
+      expect(result.error).toBe('string error');
+      expect(result.code).toBe(ExitCode.GENERAL_ERROR);
+      expect(exitSpy).toHaveBeenCalledWith(ExitCode.GENERAL_ERROR);
+    });
   });
 
-  it('includes context in JSON output when present', () => {
-    handleError(new CliError('network error', ExitCode.NETWORK_ERROR, {
-      endpoint: '/athlete/activities',
-      retryable: true,
-    }));
+  describe('TTY mode (human)', () => {
+    beforeEach(() => {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    });
 
-    const output = JSON.parse(stderrSpy.mock.calls[0][0] as string);
-    expect(output.error).toBe('network error');
-    expect(output.code).toBe(ExitCode.NETWORK_ERROR);
-    expect(output.context.endpoint).toBe('/athlete/activities');
-    expect(output.context.retryable).toBe(true);
-  });
+    afterEach(() => {
+      Object.defineProperty(process.stdout, 'isTTY', { value: undefined, configurable: true });
+    });
 
-  it('handles unknown errors with GENERAL_ERROR', () => {
-    handleError('string error');
+    it('outputs human-readable error to stderr', () => {
+      handleError(new CliError('auth failed', ExitCode.AUTH_ERROR));
 
-    const output = JSON.parse(stderrSpy.mock.calls[0][0] as string);
-    expect(output.error).toBe('string error');
-    expect(output.code).toBe(ExitCode.GENERAL_ERROR);
-    expect(exitSpy).toHaveBeenCalledWith(ExitCode.GENERAL_ERROR);
-  });
+      expect(stderrSpy).toHaveBeenCalledWith('Error: auth failed');
+      expect(stdoutSpy).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(ExitCode.AUTH_ERROR);
+    });
 
-  it('handles Error instances with GENERAL_ERROR', () => {
-    handleError(new Error('plain error'));
+    it('includes status code in human output when available', () => {
+      handleError(new CliError('not found', ExitCode.GENERAL_ERROR, {
+        endpoint: '/athlete',
+        statusCode: 404,
+      }));
 
-    const output = JSON.parse(stderrSpy.mock.calls[0][0] as string);
-    expect(output.error).toBe('plain error');
-    expect(output.code).toBe(ExitCode.GENERAL_ERROR);
+      expect(stderrSpy).toHaveBeenCalledWith('Error: not found (404)');
+    });
   });
 });

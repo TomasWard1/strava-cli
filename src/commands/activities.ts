@@ -12,7 +12,7 @@ import {
   updateActivity,
 } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
-import { output } from '../utils/output.js';
+import { output, getFormat } from '../utils/output.js';
 import { formatActivityList, formatActivity, formatLaps } from '../utils/format.js';
 import { parseDateRange } from '../utils/date.js';
 
@@ -48,7 +48,7 @@ activitiesCommand
         ? await getAllActivities({ before: params.before, after: params.after })
         : await listActivities(params);
 
-      output(activities, () => formatActivityList(activities), opts.pretty);
+      output(activities, () => formatActivityList(activities), getFormat(opts));
     } catch (error) {
       handleError(error);
     }
@@ -61,7 +61,7 @@ activitiesCommand
   .action(async (id, opts) => {
     try {
       const activity = await getActivity(Number(id));
-      output(activity, () => formatActivity(activity), opts.pretty);
+      output(activity, () => formatActivity(activity), getFormat(opts));
     } catch (error) {
       handleError(error);
     }
@@ -74,7 +74,7 @@ activitiesCommand
   .action(async (id, opts) => {
     try {
       const laps = await getActivityLaps(Number(id));
-      output(laps, () => formatLaps(laps), opts.pretty);
+      output(laps, () => formatLaps(laps), getFormat(opts));
     } catch (error) {
       handleError(error);
     }
@@ -153,7 +153,7 @@ activitiesCommand
         trainer: opts.trainer,
         commute: opts.commute,
       });
-      output(activity, () => formatActivity(activity), false);
+      output(activity, () => formatActivity(activity));
     } catch (error) {
       handleError(error);
     }
@@ -179,7 +179,7 @@ activitiesCommand
       if (opts.commute) params.commute = true;
 
       const activity = await updateActivity(Number(id), params);
-      output(activity, () => formatActivity(activity), false);
+      output(activity, () => formatActivity(activity));
     } catch (error) {
       handleError(error);
     }
@@ -191,7 +191,7 @@ activitiesCommand
   .action(async (opts) => {
     try {
       const activities = await listActivities({ per_page: 30 });
-      output(activities, () => formatActivityList(activities), opts.pretty);
+      output(activities, () => formatActivityList(activities), getFormat(opts));
     } catch (error) {
       handleError(error);
     }

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { getAthlete, getAthleteStats, getAthleteZones, updateAthlete } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
-import { output } from '../utils/output.js';
+import { output, getFormat } from '../utils/output.js';
 import { formatAthlete, formatAthleteStats } from '../utils/format.js';
 
 export const athleteCommand = new Command('athlete')
@@ -14,7 +14,7 @@ athleteCommand
   .action(async (opts) => {
     try {
       const profile = await getAthlete();
-      output(profile, () => formatAthlete(profile), opts.pretty);
+      output(profile, () => formatAthlete(profile), getFormat(opts));
     } catch (error) {
       handleError(error);
     }
@@ -28,7 +28,7 @@ athleteCommand
     try {
       const profile = await getAthlete();
       const stats = await getAthleteStats(profile.id);
-      output(stats, () => formatAthleteStats(stats), opts.pretty);
+      output(stats, () => formatAthleteStats(stats), getFormat(opts));
     } catch (error) {
       handleError(error);
     }
@@ -56,7 +56,7 @@ athleteCommand
       if (opts.weight) params.weight = Number(opts.weight);
 
       const profile = await updateAthlete(params);
-      output(profile, () => formatAthlete(profile), false);
+      output(profile, () => formatAthlete(profile));
     } catch (error) {
       handleError(error);
     }
@@ -68,7 +68,7 @@ athleteCommand
   .action(async (opts) => {
     try {
       const profile = await getAthlete();
-      output(profile, () => formatAthlete(profile), opts.pretty);
+      output(profile, () => formatAthlete(profile), getFormat(opts));
     } catch (error) {
       handleError(error);
     }

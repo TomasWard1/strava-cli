@@ -8,7 +8,7 @@ import {
   starSegment,
 } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
-import { output } from '../utils/output.js';
+import { output, getFormat } from '../utils/output.js';
 import { formatSegment } from '../utils/format.js';
 
 export const segmentsCommand = new Command('segments')
@@ -21,7 +21,7 @@ segmentsCommand
   .action(async (id, opts) => {
     try {
       const segment = await getSegment(Number(id));
-      output(segment, () => formatSegment(segment), opts.pretty);
+      output(segment, () => formatSegment(segment), getFormat(opts));
     } catch (error) {
       handleError(error);
     }
@@ -84,7 +84,7 @@ segmentsCommand
   .action(async (id, opts) => {
     try {
       const segment = await starSegment(Number(id), !opts.unstar);
-      output(segment, () => formatSegment(segment), false);
+      output(segment, () => formatSegment(segment));
     } catch (error) {
       handleError(error);
     }

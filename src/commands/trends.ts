@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { getAllActivities } from '../api/strava.js';
 import { parseDateRange } from '../utils/date.js';
 import { analyzeTrends, formatTrends } from '../utils/analysis.js';
-import { output } from '../utils/output.js';
+import { output, getFormat } from '../utils/output.js';
 import { handleError } from '../utils/errors.js';
 
 export const trendsCommand = new Command('trends')
@@ -28,7 +28,7 @@ export const trendsCommand = new Command('trends')
       const activities = await getAllActivities({ after, before });
       const trends = analyzeTrends(activities, period);
 
-      output(trends, () => formatTrends(trends), opts.pretty);
+      output(trends, () => formatTrends(trends), getFormat(opts));
     } catch (error) {
       handleError(error);
     }
