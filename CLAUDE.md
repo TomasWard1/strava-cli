@@ -30,7 +30,11 @@ Agent-first CLI for the Strava API v3.
 src/
 ├── index.ts          # Entry point
 ├── cli.ts            # Command registration
-├── auth/             # OAuth 2.0 (login, tokens, callback server)
+├── auth/             # OAuth 2.0 (login, tokens, callback server, config)
+│   ├── config.ts     # Credential storage (env vars > config file > prompt)
+│   ├── oauth.ts      # Login flow with interactive onboarding
+│   ├── tokens.ts     # Token persistence and auto-refresh
+│   └── server.ts     # OAuth callback HTTP server
 ├── api/              # HTTP client, endpoints, Strava API wrapper
 │   ├── client.ts     # makeRequest(), fetchAllPages(), rate limiting
 │   ├── retry.ts      # withRetry() — exponential backoff with jitter
@@ -48,7 +52,16 @@ src/
 - **Auto-refresh**: tokens refresh transparently before expiry
 - **Auto-retry**: network errors and 429s retry with exponential backoff (3 retries, 1s base)
 
-### Environment Variables
+### Credential Resolution
+
+Priority chain: **env vars > config file > interactive prompt** (TTY only)
+
+```
+~/.strava-cli/config.json  ← credentials (client_id, client_secret)
+~/.strava-cli/tokens.json  ← OAuth tokens (access_token, refresh_token, expires_at)
+```
+
+Environment variables (override config file):
 ```
 STRAVA_CLIENT_ID     — Strava API application client ID
 STRAVA_CLIENT_SECRET — Strava API application client secret

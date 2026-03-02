@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import open from 'open';
 import { saveTokens, clearTokens, getTokenStatus, getValidTokens, isTokenExpired, loadTokens } from './tokens.js';
+import { getCredentials, saveConfig } from './config.js';
 import { findAvailablePort, startCallbackServer } from './server.js';
 import { CliError, ExitCode } from '../utils/errors.js';
 
@@ -8,22 +9,133 @@ const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/authorize';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
 const SCOPES = 'read,read_all,profile:read_all,activity:read,activity:read_all';
 
-function getCredentials(): { clientId: string; clientSecret: string } {
-  const clientId = process.env.STRAVA_CLIENT_ID;
-  const clientSecret = process.env.STRAVA_CLIENT_SECRET;
+function isTTY(): boolean {
+  return !!process.stdout.isTTY;
+}
+
+/**
+ * Read a line from stdin. Works in both TTY and piped modes.
+ */
+function readLine(prompt: string): Promise<string> {
+  return new Promise((resolve) => {
+    process.stderr.write(prompt);
+    let data = '';
+    process.stdin.setEncoding('utf-8');
+    process.stdin.resume();
+    process.stdin.once('data', (chunk) => {
+      data = chunk.toString().trim();
+      process.stdin.pause();
+      resolve(data);
+    });
+  });
+}
+
+/**
+ * Read a secret from stdin with masked input (shows * for each char).
+ * Handles paste as a single chunk by iterating chars.
+ */
+function promptSecret(prompt: string): Promise<string> {
+  return new Promise((resolve) => {
+    process.stderr.write(prompt);
+
+    if (!process.stdin.isTTY) {
+      // Non-interactive: just read the line
+      let data = '';
+      process.stdin.setEncoding('utf-8');
+      process.stdin.resume();
+      process.stdin.once('data', (chunk) => {
+        data = chunk.toString().trim();
+        process.stdin.pause();
+        resolve(data);
+      });
+      return;
+    }
+
+    // Interactive: mask input with raw mode
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf-8');
+
+    let secret = '';
+    const onData = (data: string) => {
+      // Clipboard paste arrives as single chunk — iterate chars
+      for (const char of data) {
+        if (char === '\r' || char === '\n') {
+          process.stderr.write('\n');
+          process.stdin.setRawMode(false);
+          process.stdin.pause();
+          process.stdin.removeListener('data', onData);
+          resolve(secret);
+          return;
+        }
+        if (char === '\u007F' || char === '\b') {
+          // Backspace
+          if (secret.length > 0) {
+            secret = secret.slice(0, -1);
+            process.stderr.write('\b \b');
+          }
+        } else if (char === '\u0003') {
+          // Ctrl+C
+          process.stderr.write('\n');
+          process.exit(1);
+        } else {
+          secret += char;
+          process.stderr.write('*');
+        }
+      }
+    };
+
+    process.stdin.on('data', onData);
+  });
+}
+
+/**
+ * Interactive onboarding: prompt for credentials when none found.
+ * Only runs in TTY mode.
+ */
+async function interactiveSetup(): Promise<{ clientId: string; clientSecret: string }> {
+  process.stderr.write('\n');
+  process.stderr.write('  Strava CLI Setup\n');
+  process.stderr.write('  ================\n\n');
+  process.stderr.write('  1. Go to https://www.strava.com/settings/api\n');
+  process.stderr.write('  2. Create an application (or use an existing one)\n');
+  process.stderr.write('  3. Copy your Client ID and Client Secret\n\n');
+
+  const clientId = await readLine('  Client ID: ');
+  const clientSecret = await promptSecret('  Client Secret: ');
 
   if (!clientId || !clientSecret) {
-    throw new CliError(
-      'Missing STRAVA_CLIENT_ID or STRAVA_CLIENT_SECRET in environment',
-      ExitCode.AUTH_ERROR,
-    );
+    throw new CliError('Client ID and Client Secret are required', ExitCode.AUTH_ERROR);
   }
+
+  // Save to config file for future use
+  saveConfig({ client_id: clientId, client_secret: clientSecret });
+  process.stderr.write('\n  Credentials saved to ~/.strava-cli/config.json\n\n');
 
   return { clientId, clientSecret };
 }
 
+/**
+ * Get or prompt for credentials.
+ * Agent mode: env vars or config file, fail if missing.
+ * Human mode: interactive prompt if not found.
+ */
+async function resolveCredentials(): Promise<{ clientId: string; clientSecret: string }> {
+  const creds = getCredentials();
+  if (creds) return creds;
+
+  if (isTTY()) {
+    return interactiveSetup();
+  }
+
+  throw new CliError(
+    'No credentials found. Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET env vars',
+    ExitCode.AUTH_ERROR,
+  );
+}
+
 export async function login(): Promise<void> {
-  const { clientId, clientSecret } = getCredentials();
+  const { clientId, clientSecret } = await resolveCredentials();
   const state = randomBytes(16).toString('hex');
   const port = await findAvailablePort(8420);
   const redirectUri = `http://localhost:${port}/callback`;
@@ -39,8 +151,10 @@ export async function login(): Promise<void> {
   // Start callback server before opening browser
   const callbackPromise = startCallbackServer(port);
 
-  console.error('Opening browser for Strava authorization...');
-  console.error(`\nIf browser does not open, visit:\n${authUrl.toString()}\n`);
+  if (isTTY()) {
+    process.stderr.write('Opening browser for Strava authorization...\n');
+    process.stderr.write(`\nIf browser does not open, visit:\n${authUrl.toString()}\n\n`);
+  }
 
   await open(authUrl.toString()).catch(() => {
     // Browser open failed, user will use the URL manually
@@ -78,12 +192,22 @@ export async function login(): Promise<void> {
     token_type: data.token_type,
   });
 
-  console.log(JSON.stringify({ success: true, message: 'Authentication successful' }));
+  if (isTTY()) {
+    const name = data.athlete ? `${data.athlete.firstname} ${data.athlete.lastname}` : '';
+    process.stderr.write(`\nYou're in!${name ? ` Welcome, ${name}.` : ''}\n`);
+  } else {
+    console.log(JSON.stringify({ success: true }));
+  }
 }
 
 export function logout(): void {
   clearTokens();
-  console.log(JSON.stringify({ success: true, message: 'Logged out' }));
+
+  if (isTTY()) {
+    process.stderr.write('Logged out.\n');
+  } else {
+    console.log(JSON.stringify({ success: true }));
+  }
 }
 
 export function status(): void {
@@ -91,23 +215,32 @@ export function status(): void {
   const tokens = loadTokens();
 
   if (!tokenStatus.authenticated) {
-    console.log(JSON.stringify({
-      authenticated: false,
-      message: 'Not logged in. Run: strava-cli auth login',
-    }));
-    return;
+    if (isTTY()) {
+      process.stderr.write('Not authenticated. Run: strava-cli auth login\n');
+    } else {
+      console.log(JSON.stringify({ authenticated: false }));
+    }
+    process.exit(ExitCode.AUTH_ERROR);
   }
 
   const now = Math.floor(Date.now() / 1000);
   const expiresIn = tokenStatus.expires_at! - now;
+  const needsRefresh = isTokenExpired(tokens!);
 
-  console.log(JSON.stringify({
-    authenticated: true,
-    expires_at: tokenStatus.expires_at,
-    expires_in_seconds: expiresIn,
-    expires_in_human: expiresIn > 0 ? `${Math.floor(expiresIn / 60)} minutes` : 'EXPIRED',
-    needs_refresh: isTokenExpired(tokens!),
-  }));
+  if (isTTY()) {
+    if (needsRefresh) {
+      process.stderr.write('Authenticated (token needs refresh)\n');
+    } else {
+      process.stderr.write(`Authenticated (expires in ${Math.floor(expiresIn / 60)} min)\n`);
+    }
+  } else {
+    console.log(JSON.stringify({
+      authenticated: true,
+      expires_at: tokenStatus.expires_at,
+      expires_in_seconds: expiresIn,
+      needs_refresh: needsRefresh,
+    }));
+  }
 }
 
 export async function refresh(): Promise<void> {
@@ -121,11 +254,13 @@ export async function refresh(): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
   const expiresIn = newTokens.expires_at - now;
 
-  console.log(JSON.stringify({
-    success: true,
-    message: 'Token refreshed successfully',
-    expires_at: newTokens.expires_at,
-    expires_in_seconds: expiresIn,
-    expires_in_human: `${Math.floor(expiresIn / 60)} minutes`,
-  }));
+  if (isTTY()) {
+    process.stderr.write(`Token refreshed (expires in ${Math.floor(expiresIn / 60)} min)\n`);
+  } else {
+    console.log(JSON.stringify({
+      success: true,
+      expires_at: newTokens.expires_at,
+      expires_in_seconds: expiresIn,
+    }));
+  }
 }
