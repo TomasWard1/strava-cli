@@ -1,6 +1,7 @@
 import { getValidTokens } from '../auth/tokens.js';
 import { BASE_URL } from './endpoints.js';
 import { CliError, ExitCode } from '../utils/errors.js';
+import { withRetry } from './retry.js';
 
 export interface QueryParams {
   page?: number;
@@ -68,31 +69,58 @@ export async function makeRequest<T>(
     }
   }
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${tokens.access_token}`,
-      'Content-Type': 'application/json',
+  return withRetry(
+    async () => {
+      const response = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      updateRateLimits(response.headers);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new CliError('Authentication failed. Run: strava-cli auth login', ExitCode.AUTH_ERROR);
+        }
+        if (response.status === 429) {
+          const status = getRateLimitStatus();
+          throw new CliError(
+            `Rate limit exceeded (15min: ${status.fifteen_min.used}/${status.fifteen_min.limit}, daily: ${status.daily.used}/${status.daily.limit})`,
+            ExitCode.RATE_LIMIT,
+          );
+        }
+        const text = await response.text();
+        throw new CliError(`API request failed (${response.status}): ${text}`, ExitCode.GENERAL_ERROR);
+      }
+
+      return response.json() as Promise<T>;
     },
-  });
-
-  updateRateLimits(response.headers);
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new CliError('Authentication failed. Run: strava-cli auth login', ExitCode.AUTH_ERROR);
-    }
-    if (response.status === 429) {
-      const status = getRateLimitStatus();
-      throw new CliError(
-        `Rate limit exceeded (15min: ${status.fifteen_min.used}/${status.fifteen_min.limit}, daily: ${status.daily.used}/${status.daily.limit})`,
-        ExitCode.RATE_LIMIT,
-      );
-    }
-    const text = await response.text();
-    throw new CliError(`API request failed (${response.status}): ${text}`, ExitCode.GENERAL_ERROR);
-  }
-
-  return response.json() as Promise<T>;
+    {
+      maxRetries: 3,
+      baseDelayMs: 1000,
+      shouldRetry: (error) => {
+        // Don't retry auth errors
+        if (error instanceof CliError && error.exitCode === ExitCode.AUTH_ERROR) {
+          return false;
+        }
+        // Retry rate limits and network errors
+        if (error instanceof CliError && error.exitCode === ExitCode.RATE_LIMIT) {
+          return true;
+        }
+        // Retry network errors (fetch throws TypeError on network failure)
+        if (error.name === 'TypeError') {
+          return true;
+        }
+        // Don't retry other API errors (4xx, 5xx)
+        if (error instanceof CliError) {
+          return false;
+        }
+        return true;
+      },
+    },
+  );
 }
 
 export async function fetchAllPages<T>(

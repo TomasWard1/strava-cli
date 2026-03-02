@@ -33,6 +33,7 @@ src/
 ├── auth/             # OAuth 2.0 (login, tokens, callback server)
 ├── api/              # HTTP client, endpoints, Strava API wrapper
 │   ├── client.ts     # makeRequest(), fetchAllPages(), rate limiting
+│   ├── retry.ts      # withRetry() — exponential backoff with jitter
 │   ├── endpoints.ts  # URL constants
 │   └── strava.ts     # High-level API functions
 ├── commands/         # CLI command definitions
@@ -45,6 +46,7 @@ src/
 - **Errors to stderr** — human messages go to stderr, structured errors to stdout
 - **Exit codes**: 0=success, 1=general, 2=auth, 3=rate limit, 4=network
 - **Auto-refresh**: tokens refresh transparently before expiry
+- **Auto-retry**: network errors and 429s retry with exponential backoff (3 retries, 1s base)
 
 ### Environment Variables
 ```
