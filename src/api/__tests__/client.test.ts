@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { makeRequest, fetchAllPages, getRateLimitStatus } from '../client.js';
-import { ExitCode } from '../../utils/errors.js';
+import { CliError, ExitCode } from '../../utils/errors.js';
+import { withRetry } from '../retry.js';
 
 // Mock getValidTokens
 vi.mock('../../auth/tokens.js', () => ({
@@ -10,6 +11,11 @@ vi.mock('../../auth/tokens.js', () => ({
     expires_at: 9999999999,
     token_type: 'Bearer',
   }),
+}));
+
+// Mock retry to execute immediately without delays
+vi.mock('../retry.js', () => ({
+  withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
 describe('makeRequest', () => {
@@ -88,6 +94,41 @@ describe('makeRequest', () => {
     await expect(makeRequest('/athlete')).rejects.toMatchObject({
       exitCode: ExitCode.RATE_LIMIT,
     });
+  });
+
+  it('calls withRetry with correct retry config', async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+      headers: new Headers(),
+    };
+    vi.mocked(fetch).mockResolvedValue(mockResponse as Response);
+
+    await makeRequest('/athlete');
+
+    expect(withRetry).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        maxRetries: 3,
+        baseDelayMs: 1000,
+        shouldRetry: expect.any(Function),
+      }),
+    );
+
+    // Extract shouldRetry and test its logic
+    const options = vi.mocked(withRetry).mock.calls[0][1]!;
+    const shouldRetry = options.shouldRetry!;
+
+    // Auth errors should NOT retry
+    expect(shouldRetry(new CliError('auth fail', ExitCode.AUTH_ERROR))).toBe(false);
+    // Rate limit errors SHOULD retry
+    expect(shouldRetry(new CliError('rate limit', ExitCode.RATE_LIMIT))).toBe(true);
+    // Network errors (TypeError from fetch) SHOULD retry
+    const networkError = new TypeError('fetch failed');
+    expect(shouldRetry(networkError)).toBe(true);
+    // General API errors should NOT retry
+    expect(shouldRetry(new CliError('server error', ExitCode.GENERAL_ERROR))).toBe(false);
   });
 
   it('tracks rate limit from response headers', async () => {
