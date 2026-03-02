@@ -5,6 +5,7 @@ import {
   getAllStarredSegments,
   getSegmentEffort,
   exploreSegments,
+  starSegment,
 } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
 import { output } from '../utils/output.js';
@@ -71,6 +72,19 @@ segmentsCommand
         activity_type: opts.type,
       });
       console.log(JSON.stringify(result));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+segmentsCommand
+  .command('star <id>')
+  .description('Star or unstar a segment')
+  .option('--unstar', 'unstar instead of star')
+  .action(async (id, opts) => {
+    try {
+      const segment = await starSegment(Number(id), !opts.unstar);
+      output(segment, () => formatSegment(segment), false);
     } catch (error) {
       handleError(error);
     }

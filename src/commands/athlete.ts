@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { getAthlete, getAthleteStats, getAthleteZones } from '../api/strava.js';
+import { getAthlete, getAthleteStats, getAthleteZones, updateAthlete } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
 import { output } from '../utils/output.js';
 import { formatAthlete, formatAthleteStats } from '../utils/format.js';
@@ -41,6 +41,22 @@ athleteCommand
     try {
       const zones = await getAthleteZones();
       console.log(JSON.stringify(zones));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+athleteCommand
+  .command('update')
+  .description('Update athlete profile')
+  .option('--weight <kg>', 'body weight in kg')
+  .action(async (opts) => {
+    try {
+      const params: Record<string, unknown> = {};
+      if (opts.weight) params.weight = Number(opts.weight);
+
+      const profile = await updateAthlete(params);
+      output(profile, () => formatAthlete(profile), false);
     } catch (error) {
       handleError(error);
     }

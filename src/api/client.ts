@@ -54,9 +54,15 @@ export function getRateLimitStatus(): RateLimitInfo {
   return { ...rateLimitState };
 }
 
+export interface RequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: Record<string, unknown>;
+}
+
 export async function makeRequest<T>(
   endpoint: string,
   params?: QueryParams,
+  options?: RequestOptions,
 ): Promise<T> {
   const tokens = await getValidTokens();
 
@@ -73,12 +79,19 @@ export async function makeRequest<T>(
     async () => {
       let response: Response;
       try {
-        response = await fetch(url.toString(), {
+        const fetchOptions: RequestInit = {
           headers: {
             Authorization: `Bearer ${tokens.access_token}`,
             'Content-Type': 'application/json',
           },
-        });
+        };
+        if (options?.method) {
+          fetchOptions.method = options.method;
+        }
+        if (options?.body) {
+          fetchOptions.body = JSON.stringify(options.body);
+        }
+        response = await fetch(url.toString(), fetchOptions);
       } catch (error) {
         throw new CliError(
           `Network error: ${error instanceof Error ? error.message : String(error)}`,

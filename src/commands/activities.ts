@@ -8,6 +8,8 @@ import {
   getActivityComments,
   getActivityKudos,
   getActivityStreams,
+  createActivity,
+  updateActivity,
 } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
 import { output } from '../utils/output.js';
@@ -123,6 +125,61 @@ activitiesCommand
       const keys = opts.keys.split(',');
       const streams = await getActivityStreams(Number(id), keys);
       console.log(JSON.stringify(streams));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('create')
+  .description('Create a manual activity')
+  .requiredOption('--name <name>', 'activity name')
+  .requiredOption('--sport-type <type>', 'sport type (Run, Ride, Swim, etc.)')
+  .requiredOption('--start-date <date>', 'start date (ISO 8601)')
+  .requiredOption('--elapsed-time <seconds>', 'elapsed time in seconds')
+  .option('--description <text>', 'activity description')
+  .option('--distance <meters>', 'distance in meters')
+  .option('--trainer', 'mark as trainer activity')
+  .option('--commute', 'mark as commute')
+  .action(async (opts) => {
+    try {
+      const activity = await createActivity({
+        name: opts.name,
+        sport_type: opts.sportType,
+        start_date_local: opts.startDate,
+        elapsed_time: Number(opts.elapsedTime),
+        description: opts.description,
+        distance: opts.distance ? Number(opts.distance) : undefined,
+        trainer: opts.trainer,
+        commute: opts.commute,
+      });
+      output(activity, () => formatActivity(activity), false);
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('update <id>')
+  .description('Update an existing activity')
+  .option('--name <name>', 'new name')
+  .option('--sport-type <type>', 'new sport type')
+  .option('--description <text>', 'new description')
+  .option('--gear-id <id>', 'gear ID to assign')
+  .option('--trainer', 'mark as trainer activity')
+  .option('--commute', 'mark as commute')
+  .action(async (id, opts) => {
+    try {
+      const params: Record<string, unknown> = {};
+      if (opts.name) params.name = opts.name;
+      if (opts.sportType) params.sport_type = opts.sportType;
+      if (opts.description) params.description = opts.description;
+      if (opts.gearId) params.gear_id = opts.gearId;
+      if (opts.trainer) params.trainer = true;
+      if (opts.commute) params.commute = true;
+
+      const activity = await updateActivity(Number(id), params);
+      output(activity, () => formatActivity(activity), false);
     } catch (error) {
       handleError(error);
     }

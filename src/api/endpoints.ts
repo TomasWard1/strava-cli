@@ -27,6 +27,7 @@ export const endpoints = {
   starredSegments: `${BASE_URL}/segments/starred`,
   segmentEfforts: `${BASE_URL}/segment_efforts`,
   segmentEffort: (id: number) => `${BASE_URL}/segment_efforts/${id}`,
+  segmentStarred: (id: number) => `${BASE_URL}/segments/${id}/starred`,
   exploreSegments: `${BASE_URL}/segments/explore`,
 
   // Routes

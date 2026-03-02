@@ -156,6 +156,59 @@ describe('makeRequest', () => {
     });
   });
 
+  it('sends POST request with JSON body', async () => {
+    const mockResponse = {
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ id: 123 }),
+      headers: new Headers(),
+    };
+    vi.mocked(fetch).mockResolvedValue(mockResponse as Response);
+
+    const result = await makeRequest('/activities', undefined, {
+      method: 'POST',
+      body: { name: 'Morning Run', type: 'Run' },
+    });
+
+    expect(result).toEqual({ id: 123 });
+    const [, fetchOpts] = vi.mocked(fetch).mock.calls[0];
+    expect(fetchOpts?.method).toBe('POST');
+    expect(fetchOpts?.body).toBe(JSON.stringify({ name: 'Morning Run', type: 'Run' }));
+  });
+
+  it('sends PUT request with JSON body', async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: 123, name: 'Updated' }),
+      headers: new Headers(),
+    };
+    vi.mocked(fetch).mockResolvedValue(mockResponse as Response);
+
+    await makeRequest('/activities/123', undefined, {
+      method: 'PUT',
+      body: { name: 'Updated' },
+    });
+
+    const [, fetchOpts] = vi.mocked(fetch).mock.calls[0];
+    expect(fetchOpts?.method).toBe('PUT');
+  });
+
+  it('defaults to GET when no options provided', async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+      headers: new Headers(),
+    };
+    vi.mocked(fetch).mockResolvedValue(mockResponse as Response);
+
+    await makeRequest('/athlete');
+
+    const [, fetchOpts] = vi.mocked(fetch).mock.calls[0];
+    expect(fetchOpts?.method).toBeUndefined();
+  });
+
   it('tracks rate limit from response headers', async () => {
     const mockResponse = {
       ok: true,
