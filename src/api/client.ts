@@ -71,28 +71,46 @@ export async function makeRequest<T>(
 
   return withRetry(
     async () => {
-      const response = await fetch(url.toString(), {
-        headers: {
-          Authorization: `Bearer ${tokens.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      let response: Response;
+      try {
+        response = await fetch(url.toString(), {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (error) {
+        throw new CliError(
+          `Network error: ${error instanceof Error ? error.message : String(error)}`,
+          ExitCode.NETWORK_ERROR,
+          { endpoint, retryable: true },
+        );
+      }
 
       updateRateLimits(response.headers);
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new CliError('Authentication failed. Run: strava-cli auth login', ExitCode.AUTH_ERROR);
+          throw new CliError(
+            'Authentication failed. Run: strava-cli auth login',
+            ExitCode.AUTH_ERROR,
+            { endpoint, statusCode: 401, retryable: false },
+          );
         }
         if (response.status === 429) {
           const status = getRateLimitStatus();
           throw new CliError(
             `Rate limit exceeded (15min: ${status.fifteen_min.used}/${status.fifteen_min.limit}, daily: ${status.daily.used}/${status.daily.limit})`,
             ExitCode.RATE_LIMIT,
+            { endpoint, statusCode: 429, retryable: true },
           );
         }
         const text = await response.text();
-        throw new CliError(`API request failed (${response.status}): ${text}`, ExitCode.GENERAL_ERROR);
+        throw new CliError(
+          `API request failed (${response.status}): ${text}`,
+          ExitCode.GENERAL_ERROR,
+          { endpoint, statusCode: response.status, retryable: false },
+        );
       }
 
       return response.json() as Promise<T>;
@@ -101,22 +119,15 @@ export async function makeRequest<T>(
       maxRetries: 3,
       baseDelayMs: 1000,
       shouldRetry: (error) => {
-        // Don't retry auth errors
-        if (error instanceof CliError && error.exitCode === ExitCode.AUTH_ERROR) {
-          return false;
-        }
-        // Retry rate limits and network errors
-        if (error instanceof CliError && error.exitCode === ExitCode.RATE_LIMIT) {
-          return true;
-        }
-        // Retry network errors (fetch throws TypeError on network failure)
-        if (error.name === 'TypeError') {
-          return true;
-        }
-        // Don't retry other API errors (4xx, 5xx)
         if (error instanceof CliError) {
+          // Retry network errors and rate limits
+          if (error.exitCode === ExitCode.NETWORK_ERROR || error.exitCode === ExitCode.RATE_LIMIT) {
+            return true;
+          }
+          // Don't retry auth or other API errors
           return false;
         }
+        // Retry unknown errors (network issues, etc.)
         return true;
       },
     },

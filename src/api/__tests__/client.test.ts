@@ -124,11 +124,36 @@ describe('makeRequest', () => {
     expect(shouldRetry(new CliError('auth fail', ExitCode.AUTH_ERROR))).toBe(false);
     // Rate limit errors SHOULD retry
     expect(shouldRetry(new CliError('rate limit', ExitCode.RATE_LIMIT))).toBe(true);
-    // Network errors (TypeError from fetch) SHOULD retry
-    const networkError = new TypeError('fetch failed');
-    expect(shouldRetry(networkError)).toBe(true);
+    // Network errors SHOULD retry
+    expect(shouldRetry(new CliError('network', ExitCode.NETWORK_ERROR))).toBe(true);
+    // Unknown errors SHOULD retry
+    expect(shouldRetry(new TypeError('fetch failed'))).toBe(true);
     // General API errors should NOT retry
     expect(shouldRetry(new CliError('server error', ExitCode.GENERAL_ERROR))).toBe(false);
+  });
+
+  it('wraps fetch network errors with NETWORK_ERROR and context', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('fetch failed'));
+
+    await expect(makeRequest('/athlete')).rejects.toMatchObject({
+      exitCode: ExitCode.NETWORK_ERROR,
+      context: { endpoint: '/athlete', retryable: true },
+    });
+  });
+
+  it('includes endpoint and status in error context on HTTP errors', async () => {
+    const mockResponse = {
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve('Unauthorized'),
+      headers: new Headers(),
+    };
+    vi.mocked(fetch).mockResolvedValue(mockResponse as Response);
+
+    await expect(makeRequest('/athlete/activities')).rejects.toMatchObject({
+      exitCode: ExitCode.AUTH_ERROR,
+      context: { endpoint: '/athlete/activities', statusCode: 401, retryable: false },
+    });
   });
 
   it('tracks rate limit from response headers', async () => {

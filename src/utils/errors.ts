@@ -6,10 +6,18 @@ export enum ExitCode {
   NETWORK_ERROR = 4,
 }
 
+export interface ErrorContext {
+  endpoint?: string;
+  statusCode?: number;
+  retryable?: boolean;
+  [key: string]: unknown;
+}
+
 export class CliError extends Error {
   constructor(
     message: string,
     public exitCode: ExitCode = ExitCode.GENERAL_ERROR,
+    public context?: ErrorContext,
   ) {
     super(message);
     this.name = 'CliError';
@@ -18,7 +26,14 @@ export class CliError extends Error {
 
 export function handleError(error: unknown): never {
   if (error instanceof CliError) {
-    console.error(JSON.stringify({ error: error.message, code: error.exitCode }));
+    const output: Record<string, unknown> = {
+      error: error.message,
+      code: error.exitCode,
+    };
+    if (error.context) {
+      output.context = error.context;
+    }
+    console.error(JSON.stringify(output));
     process.exit(error.exitCode);
   }
 
