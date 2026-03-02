@@ -1,6 +1,8 @@
 import { Command } from 'commander';
 import { getRoute, getAthleteRoutes, getRouteStreams, getAthlete } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
+import { output } from '../utils/output.js';
+import { formatRoute } from '../utils/format.js';
 
 export const routesCommand = new Command('routes')
   .description('List and inspect routes');
@@ -26,10 +28,11 @@ routesCommand
 routesCommand
   .command('get <id>')
   .description('Get route details by ID')
-  .action(async (id) => {
+  .option('--pretty', 'human-readable output')
+  .action(async (id, opts) => {
     try {
       const route = await getRoute(Number(id));
-      console.log(JSON.stringify(route));
+      output(route, () => formatRoute(route), opts.pretty);
     } catch (error) {
       handleError(error);
     }
