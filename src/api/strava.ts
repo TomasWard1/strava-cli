@@ -163,3 +163,60 @@ export async function getClubMembers(
 export async function getGear(id: string): Promise<StravaGear> {
   return makeRequest<StravaGear>(`/gear/${id}`);
 }
+
+// --- Write Operations ---
+
+export interface CreateActivityParams {
+  name: string;
+  sport_type: string;
+  start_date_local: string;
+  elapsed_time: number;
+  description?: string;
+  distance?: number;
+  trainer?: boolean;
+  commute?: boolean;
+}
+
+export async function createActivity(params: CreateActivityParams): Promise<StravaActivity> {
+  return makeRequest<StravaActivity>('/activities', undefined, {
+    method: 'POST',
+    body: params as unknown as Record<string, unknown>,
+  });
+}
+
+export interface UpdateActivityParams {
+  name?: string;
+  sport_type?: string;
+  description?: string;
+  trainer?: boolean;
+  commute?: boolean;
+  gear_id?: string;
+}
+
+export async function updateActivity(
+  id: number,
+  params: UpdateActivityParams,
+): Promise<StravaActivity> {
+  return makeRequest<StravaActivity>(`/activities/${id}`, undefined, {
+    method: 'PUT',
+    body: params as unknown as Record<string, unknown>,
+  });
+}
+
+export interface UpdateAthleteParams {
+  weight?: number;
+}
+
+export async function updateAthlete(params: UpdateAthleteParams): Promise<StravaAthlete> {
+  return makeRequest<StravaAthlete>('/athlete', undefined, {
+    method: 'PUT',
+    body: params as unknown as Record<string, unknown>,
+  });
+}
+
+export async function starSegment(id: number, starred: boolean): Promise<StravaSegment> {
+  return makeRequest<StravaSegment>(`/segments/${id}/starred`, undefined, {
+    method: 'PUT',
+    body: { starred },
+  });
+}

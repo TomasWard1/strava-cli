@@ -12,6 +12,10 @@ import {
   getRoute,
   getAthleteClubs,
   getGear,
+  createActivity,
+  updateActivity,
+  updateAthlete,
+  starSegment,
 } from '../strava.js';
 
 vi.mock('../../auth/tokens.js', () => ({
@@ -172,6 +176,66 @@ describe('Strava API', () => {
 
       const url = vi.mocked(fetch).mock.calls[0][0] as string;
       expect(url).toContain('/gear/g123');
+    });
+  });
+
+  describe('Write Operations', () => {
+    it('createActivity sends POST with activity data', async () => {
+      const created = { id: 999, name: 'Manual Run' };
+      vi.stubGlobal('fetch', mockFetch(created));
+
+      const result = await createActivity({
+        name: 'Manual Run',
+        sport_type: 'Run',
+        start_date_local: '2024-01-15T08:00:00Z',
+        elapsed_time: 3600,
+      });
+
+      expect(result).toEqual(created);
+      const [, opts] = vi.mocked(fetch).mock.calls[0];
+      expect(opts?.method).toBe('POST');
+      expect(JSON.parse(opts?.body as string)).toMatchObject({
+        name: 'Manual Run',
+        sport_type: 'Run',
+      });
+    });
+
+    it('updateActivity sends PUT with updated fields', async () => {
+      const updated = { id: 456, name: 'Renamed Run' };
+      vi.stubGlobal('fetch', mockFetch(updated));
+
+      const result = await updateActivity(456, { name: 'Renamed Run' });
+
+      expect(result).toEqual(updated);
+      const [url, opts] = vi.mocked(fetch).mock.calls[0];
+      expect(url).toContain('/activities/456');
+      expect(opts?.method).toBe('PUT');
+    });
+
+    it('updateAthlete sends PUT to /athlete', async () => {
+      const athlete = { id: 123, weight: 75 };
+      vi.stubGlobal('fetch', mockFetch(athlete));
+
+      const result = await updateAthlete({ weight: 75 });
+
+      expect(result).toEqual(athlete);
+      const [url, opts] = vi.mocked(fetch).mock.calls[0];
+      expect(url).toContain('/athlete');
+      expect(opts?.method).toBe('PUT');
+      expect(JSON.parse(opts?.body as string)).toEqual({ weight: 75 });
+    });
+
+    it('starSegment sends PUT to /segments/{id}/starred', async () => {
+      const segment = { id: 789, starred: true };
+      vi.stubGlobal('fetch', mockFetch(segment));
+
+      const result = await starSegment(789, true);
+
+      expect(result).toEqual(segment);
+      const [url, opts] = vi.mocked(fetch).mock.calls[0];
+      expect(url).toContain('/segments/789/starred');
+      expect(opts?.method).toBe('PUT');
+      expect(JSON.parse(opts?.body as string)).toEqual({ starred: true });
     });
   });
 });
