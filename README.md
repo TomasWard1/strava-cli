@@ -26,22 +26,26 @@ Requires Node.js 22+.
 
 Go to [Strava API Settings](https://www.strava.com/settings/api) and create an application.
 
-- **Authorization Callback Domain**: `localhost`
+| Field | Value |
+|-------|-------|
+| **Authorization Callback Domain** | `localhost` |
+| **Website** | `http://example.com` — not used by the CLI |
 
-### 2. Set Environment Variables
-
-```bash
-export STRAVA_CLIENT_ID=your_client_id
-export STRAVA_CLIENT_SECRET=your_client_secret
-```
-
-### 3. Authenticate
+### 2. Authenticate
 
 ```bash
 strava-cli auth login
 ```
 
-This opens your browser for Strava authorization. A local server captures the callback — no manual copy/paste needed.
+First run prompts for your Client ID and Client Secret (from the Strava app page), saves them to `~/.strava-cli/config.json`, then opens your browser for OAuth authorization.
+
+Alternatively, set environment variables (useful for CI/agents):
+
+```bash
+export STRAVA_CLIENT_ID=your_client_id
+export STRAVA_CLIENT_SECRET=your_client_secret
+strava-cli auth login
+```
 
 ## Usage
 

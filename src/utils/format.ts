@@ -93,7 +93,7 @@ export function formatActivityList(activities: StravaActivity[]): string {
     const isRun = a.type?.toLowerCase().includes('run');
     const date = new Date(a.start_date_local).toLocaleDateString();
     const pace = speedToPace(a.average_speed, isRun);
-    return `${date} | ${a.name} | ${metersToKm(a.distance)}km | ${secondsToTime(a.moving_time)} | ${pace}`;
+    return `#${a.id} | ${date} | ${a.name} | ${metersToKm(a.distance)}km | ${secondsToTime(a.moving_time)} | ${pace}`;
   }).join('\n');
 }
 

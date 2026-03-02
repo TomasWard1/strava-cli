@@ -99,6 +99,8 @@ async function interactiveSetup(): Promise<{ clientId: string; clientSecret: str
   process.stderr.write('  ================\n\n');
   process.stderr.write('  1. Go to https://www.strava.com/settings/api\n');
   process.stderr.write('  2. Create an application (or use an existing one)\n');
+  process.stderr.write('     - Authorization Callback Domain: localhost\n');
+  process.stderr.write('     - Website: http://example.com (not used by the CLI)\n');
   process.stderr.write('  3. Copy your Client ID and Client Secret\n\n');
 
   const clientId = await readLine('  Client ID: ');

@@ -7,7 +7,7 @@ export const authCommand = new Command('auth')
 
 authCommand
   .command('login')
-  .description('Start OAuth flow (opens browser)')
+  .description('Start OAuth flow — prompts for credentials on first run (callback domain: localhost)')
   .action(async () => {
     try {
       await login();
