@@ -117,11 +117,26 @@ strava-cli gear get g12345 --pretty
 ### Auth
 
 ```bash
-strava-cli auth login    # OAuth flow (opens browser)
-strava-cli auth status   # Token status and expiry
-strava-cli auth refresh  # Proactively refresh token
-strava-cli auth logout   # Clear stored tokens
+strava-cli auth login             # OAuth flow (opens browser)
+strava-cli auth login --manual    # Headless mode (paste callback URL)
+strava-cli auth status            # Token status and expiry
+strava-cli auth refresh           # Proactively refresh token
+strava-cli auth logout            # Clear stored tokens
 ```
+
+#### Headless / VPS setup
+
+On servers without a browser, use `--manual`:
+
+```bash
+strava-cli auth login --manual
+```
+
+1. The CLI prints an authorization URL
+2. Open that URL in your local browser and authorize
+3. Your browser redirects to `localhost:8420/callback?code=...` (page won't load — that's expected)
+4. Copy the full URL from your browser's address bar
+5. Paste it back into the CLI
 
 ### Rate Limit
 
