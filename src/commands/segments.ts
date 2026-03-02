@@ -7,6 +7,8 @@ import {
   exploreSegments,
 } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
+import { output } from '../utils/output.js';
+import { formatSegment } from '../utils/format.js';
 
 export const segmentsCommand = new Command('segments')
   .description('Explore and inspect segments');
@@ -14,10 +16,11 @@ export const segmentsCommand = new Command('segments')
 segmentsCommand
   .command('get <id>')
   .description('Get segment details by ID')
-  .action(async (id) => {
+  .option('--pretty', 'human-readable output')
+  .action(async (id, opts) => {
     try {
       const segment = await getSegment(Number(id));
-      console.log(JSON.stringify(segment));
+      output(segment, () => formatSegment(segment), opts.pretty);
     } catch (error) {
       handleError(error);
     }

@@ -10,6 +10,8 @@ import {
   getActivityStreams,
 } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
+import { output } from '../utils/output.js';
+import { formatActivityList, formatActivity, formatLaps } from '../utils/format.js';
 
 export const activitiesCommand = new Command('activities')
   .description('List and inspect activities');
@@ -22,6 +24,7 @@ activitiesCommand
   .option('--before <epoch>', 'activities before epoch timestamp')
   .option('--after <epoch>', 'activities after epoch timestamp')
   .option('-a, --all', 'fetch all pages')
+  .option('--pretty', 'human-readable output')
   .action(async (opts) => {
     try {
       const params = {
@@ -35,7 +38,7 @@ activitiesCommand
         ? await getAllActivities({ before: params.before, after: params.after })
         : await listActivities(params);
 
-      console.log(JSON.stringify(activities));
+      output(activities, () => formatActivityList(activities), opts.pretty);
     } catch (error) {
       handleError(error);
     }
@@ -44,10 +47,11 @@ activitiesCommand
 activitiesCommand
   .command('get <id>')
   .description('Get a single activity by ID')
-  .action(async (id) => {
+  .option('--pretty', 'human-readable output')
+  .action(async (id, opts) => {
     try {
       const activity = await getActivity(Number(id));
-      console.log(JSON.stringify(activity));
+      output(activity, () => formatActivity(activity), opts.pretty);
     } catch (error) {
       handleError(error);
     }
@@ -56,10 +60,11 @@ activitiesCommand
 activitiesCommand
   .command('laps <id>')
   .description('Get activity laps')
-  .action(async (id) => {
+  .option('--pretty', 'human-readable output')
+  .action(async (id, opts) => {
     try {
       const laps = await getActivityLaps(Number(id));
-      console.log(JSON.stringify(laps));
+      output(laps, () => formatLaps(laps), opts.pretty);
     } catch (error) {
       handleError(error);
     }
@@ -116,11 +121,13 @@ activitiesCommand
   });
 
 // Default: list activities
-activitiesCommand.action(async () => {
-  try {
-    const activities = await listActivities({ per_page: 30 });
-    console.log(JSON.stringify(activities));
-  } catch (error) {
-    handleError(error);
-  }
-});
+activitiesCommand
+  .option('--pretty', 'human-readable output')
+  .action(async (opts) => {
+    try {
+      const activities = await listActivities({ per_page: 30 });
+      output(activities, () => formatActivityList(activities), opts.pretty);
+    } catch (error) {
+      handleError(error);
+    }
+  });

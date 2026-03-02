@@ -1,6 +1,8 @@
 import { Command } from 'commander';
 import { getAthlete, getAthleteStats, getAthleteZones } from '../api/strava.js';
 import { handleError } from '../utils/errors.js';
+import { output } from '../utils/output.js';
+import { formatAthlete, formatAthleteStats } from '../utils/format.js';
 
 export const athleteCommand = new Command('athlete')
   .description('Get authenticated athlete profile and stats');
@@ -8,10 +10,11 @@ export const athleteCommand = new Command('athlete')
 athleteCommand
   .command('profile')
   .description('Get athlete profile')
-  .action(async () => {
+  .option('--pretty', 'human-readable output')
+  .action(async (opts) => {
     try {
       const profile = await getAthlete();
-      console.log(JSON.stringify(profile));
+      output(profile, () => formatAthlete(profile), opts.pretty);
     } catch (error) {
       handleError(error);
     }
@@ -20,11 +23,12 @@ athleteCommand
 athleteCommand
   .command('stats')
   .description('Get athlete stats (totals, records)')
-  .action(async () => {
+  .option('--pretty', 'human-readable output')
+  .action(async (opts) => {
     try {
       const profile = await getAthlete();
       const stats = await getAthleteStats(profile.id);
-      console.log(JSON.stringify(stats));
+      output(stats, () => formatAthleteStats(stats), opts.pretty);
     } catch (error) {
       handleError(error);
     }
@@ -43,11 +47,13 @@ athleteCommand
   });
 
 // Default: show profile
-athleteCommand.action(async () => {
-  try {
-    const profile = await getAthlete();
-    console.log(JSON.stringify(profile));
-  } catch (error) {
-    handleError(error);
-  }
-});
+athleteCommand
+  .option('--pretty', 'human-readable output')
+  .action(async (opts) => {
+    try {
+      const profile = await getAthlete();
+      output(profile, () => formatAthlete(profile), opts.pretty);
+    } catch (error) {
+      handleError(error);
+    }
+  });
