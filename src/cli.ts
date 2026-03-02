@@ -7,6 +7,8 @@ import { routesCommand } from './commands/routes.js';
 import { clubsCommand } from './commands/clubs.js';
 import { gearCommand } from './commands/gear.js';
 import { rateLimitCommand } from './commands/ratelimit.js';
+import { summaryCommand } from './commands/summary.js';
+import { trendsCommand } from './commands/trends.js';
 
 export const program = new Command();
 
@@ -23,3 +25,5 @@ program.addCommand(routesCommand);
 program.addCommand(clubsCommand);
 program.addCommand(gearCommand);
 program.addCommand(rateLimitCommand);
+program.addCommand(summaryCommand);
+program.addCommand(trendsCommand);

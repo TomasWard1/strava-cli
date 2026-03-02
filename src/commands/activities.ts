@@ -12,6 +12,7 @@ import {
 import { handleError } from '../utils/errors.js';
 import { output } from '../utils/output.js';
 import { formatActivityList, formatActivity, formatLaps } from '../utils/format.js';
+import { parseDateRange } from '../utils/date.js';
 
 export const activitiesCommand = new Command('activities')
   .description('List and inspect activities');
@@ -23,18 +24,25 @@ activitiesCommand
   .option('-p, --page <n>', 'page number', '1')
   .option('--before <epoch>', 'activities before epoch timestamp')
   .option('--after <epoch>', 'activities after epoch timestamp')
+  .option('--today', 'today only')
+  .option('--week', 'last 7 days')
+  .option('--month', 'last 30 days')
+  .option('--year', 'year to date')
+  .option('--days <n>', 'last N days')
   .option('-a, --all', 'fetch all pages')
   .option('--pretty', 'human-readable output')
   .action(async (opts) => {
     try {
+      const dateRange = parseDateRange(opts);
       const params = {
         per_page: Number(opts.perPage),
         page: Number(opts.page),
-        before: opts.before ? Number(opts.before) : undefined,
-        after: opts.after ? Number(opts.after) : undefined,
+        before: dateRange.before,
+        after: dateRange.after,
       };
 
-      const activities = opts.all
+      const useDateFilter = opts.today || opts.week || opts.month || opts.year || opts.days;
+      const activities = (opts.all || useDateFilter)
         ? await getAllActivities({ before: params.before, after: params.after })
         : await listActivities(params);
 
