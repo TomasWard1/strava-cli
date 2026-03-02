@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { TokenData } from '../types/strava.js';
 import { CliError, ExitCode } from '../utils/errors.js';
+import { getCredentials } from './config.js';
 
 const CONFIG_DIR = join(homedir(), '.strava-cli');
 const TOKEN_FILE = join(CONFIG_DIR, 'tokens.json');
@@ -64,12 +65,16 @@ export function isTokenExpired(tokens: TokenData): boolean {
 }
 
 export async function refreshAccessToken(tokens: TokenData): Promise<TokenData> {
-  const clientId = process.env.STRAVA_CLIENT_ID;
-  const clientSecret = process.env.STRAVA_CLIENT_SECRET;
+  const creds = getCredentials();
 
-  if (!clientId || !clientSecret) {
-    throw new CliError('Missing STRAVA_CLIENT_ID or STRAVA_CLIENT_SECRET', ExitCode.AUTH_ERROR);
+  if (!creds) {
+    throw new CliError(
+      'No credentials found. Set STRAVA_CLIENT_ID/SECRET env vars or run: strava-cli auth login',
+      ExitCode.AUTH_ERROR,
+    );
   }
+
+  const { clientId, clientSecret } = creds;
 
   const response = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
