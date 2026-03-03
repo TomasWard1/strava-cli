@@ -1,0 +1,198 @@
+import { Command } from 'commander';
+import {
+  listActivities,
+  getAllActivities,
+  getActivity,
+  getActivityLaps,
+  getActivityZones,
+  getActivityComments,
+  getActivityKudos,
+  getActivityStreams,
+  createActivity,
+  updateActivity,
+} from '../api/strava.js';
+import { handleError } from '../utils/errors.js';
+import { output, getFormat } from '../utils/output.js';
+import { formatActivityList, formatActivity, formatLaps } from '../utils/format.js';
+import { parseDateRange } from '../utils/date.js';
+
+export const activitiesCommand = new Command('activities')
+  .description('List and inspect activities');
+
+activitiesCommand
+  .command('list')
+  .description('List athlete activities')
+  .option('-n, --per-page <n>', 'results per page', '30')
+  .option('-p, --page <n>', 'page number', '1')
+  .option('--before <epoch>', 'activities before epoch timestamp')
+  .option('--after <epoch>', 'activities after epoch timestamp')
+  .option('--today', 'today only')
+  .option('--week', 'last 7 days')
+  .option('--month', 'last 30 days')
+  .option('--year', 'year to date')
+  .option('--days <n>', 'last N days')
+  .option('-a, --all', 'fetch all pages')
+  .option('--pretty', 'human-readable output')
+  .action(async (opts) => {
+    try {
+      const dateRange = parseDateRange(opts);
+      const params = {
+        per_page: Number(opts.perPage),
+        page: Number(opts.page),
+        before: dateRange.before,
+        after: dateRange.after,
+      };
+
+      const useDateFilter = opts.today || opts.week || opts.month || opts.year || opts.days;
+      const activities = (opts.all || useDateFilter)
+        ? await getAllActivities({ before: params.before, after: params.after })
+        : await listActivities(params);
+
+      output(activities, () => formatActivityList(activities), getFormat(opts));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('get <id>')
+  .description('Get a single activity by ID')
+  .option('--pretty', 'human-readable output')
+  .action(async (id, opts) => {
+    try {
+      const activity = await getActivity(Number(id));
+      output(activity, () => formatActivity(activity), getFormat(opts));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('laps <id>')
+  .description('Get activity laps')
+  .option('--pretty', 'human-readable output')
+  .action(async (id, opts) => {
+    try {
+      const laps = await getActivityLaps(Number(id));
+      output(laps, () => formatLaps(laps), getFormat(opts));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('zones <id>')
+  .description('Get activity zones')
+  .action(async (id) => {
+    try {
+      const zones = await getActivityZones(Number(id));
+      console.log(JSON.stringify(zones));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('comments <id>')
+  .description('Get activity comments')
+  .action(async (id) => {
+    try {
+      const comments = await getActivityComments(Number(id));
+      console.log(JSON.stringify(comments));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('kudos <id>')
+  .description('Get activity kudos')
+  .action(async (id) => {
+    try {
+      const kudos = await getActivityKudos(Number(id));
+      console.log(JSON.stringify(kudos));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('streams <id>')
+  .description('Get activity data streams (HR, power, GPS, etc.)')
+  .option('-k, --keys <keys>', 'comma-separated stream keys', 'time,distance,heartrate,altitude,cadence,watts,latlng')
+  .action(async (id, opts) => {
+    try {
+      const keys = opts.keys.split(',');
+      const streams = await getActivityStreams(Number(id), keys);
+      console.log(JSON.stringify(streams));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('create')
+  .description('Create a manual activity')
+  .requiredOption('--name <name>', 'activity name')
+  .requiredOption('--sport-type <type>', 'sport type (Run, Ride, Swim, etc.)')
+  .requiredOption('--start-date <date>', 'start date (ISO 8601)')
+  .requiredOption('--elapsed-time <seconds>', 'elapsed time in seconds')
+  .option('--description <text>', 'activity description')
+  .option('--distance <meters>', 'distance in meters')
+  .option('--trainer', 'mark as trainer activity')
+  .option('--commute', 'mark as commute')
+  .action(async (opts) => {
+    try {
+      const activity = await createActivity({
+        name: opts.name,
+        sport_type: opts.sportType,
+        start_date_local: opts.startDate,
+        elapsed_time: Number(opts.elapsedTime),
+        description: opts.description,
+        distance: opts.distance ? Number(opts.distance) : undefined,
+        trainer: opts.trainer,
+        commute: opts.commute,
+      });
+      output(activity, () => formatActivity(activity));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+activitiesCommand
+  .command('update <id>')
+  .description('Update an existing activity')
+  .option('--name <name>', 'new name')
+  .option('--sport-type <type>', 'new sport type')
+  .option('--description <text>', 'new description')
+  .option('--gear-id <id>', 'gear ID to assign')
+  .option('--trainer', 'mark as trainer activity')
+  .option('--commute', 'mark as commute')
+  .action(async (id, opts) => {
+    try {
+      const params: Record<string, unknown> = {};
+      if (opts.name) params.name = opts.name;
+      if (opts.sportType) params.sport_type = opts.sportType;
+      if (opts.description) params.description = opts.description;
+      if (opts.gearId) params.gear_id = opts.gearId;
+      if (opts.trainer) params.trainer = true;
+      if (opts.commute) params.commute = true;
+
+      const activity = await updateActivity(Number(id), params);
+      output(activity, () => formatActivity(activity));
+    } catch (error) {
+      handleError(error);
+    }
+  });
+
+// Default: list activities
+activitiesCommand
+  .option('--pretty', 'human-readable output')
+  .action(async (opts) => {
+    try {
+      const activities = await listActivities({ per_page: 30 });
+      output(activities, () => formatActivityList(activities), getFormat(opts));
+    } catch (error) {
+      handleError(error);
+    }
+  });

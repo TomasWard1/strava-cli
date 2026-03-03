@@ -4,7 +4,8 @@
   "description": "Agent-first CLI for the Strava API",
   "type": "module",
   "bin": {
-    "strava-cli": "./dist/index.js"
+    "strava-cli": "./dist/index.js",
+    "strava": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "scripts": {
